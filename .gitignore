@@ -1,0 +1,9 @@
+# Directories to ignore
+.idea/
+venv/
+__pycache__/
+
+# Files
+.env
+database.db
+
