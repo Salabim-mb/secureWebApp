@@ -171,6 +171,17 @@ def delete_site_entry(site, login):
         raise e
 
 
+def fetch_site_list(login):
+    try:
+        with sqlite3.connect('database.db') as tran:
+            cursor = tran.cursor()
+            cursor.execute('select * from site_passwords where user_ID = ?', [login])
+            user_sites = cursor.fetchall()
+
+    except Exception as e:
+        raise e
+
+
 @app.before_request
 def check_auth():
     g.user, token = parse_token(request.headers.get('Authorization'))
@@ -245,7 +256,7 @@ def sign_up():
         if g.user != {}:
             return redirect(url_for(manage_user))
         else:
-            sleep(1)  # render template instead
+            return render_template("register.html")
     elif request.method == 'POST':
         data = request.get_json()
         email = data['email']
@@ -292,7 +303,7 @@ def manage_user():
         if g.user != {}:
             try:
                 data, connections = fetch_user_data(g.user['login'])
-                sleep(1)  # render template instead
+                return render_template("user.html", data=data, connections=connections)
             except Exception as e:
                 return make_response(jsonify({
                     'message': 'Unknown error happened while trying to fetch user data'
@@ -315,6 +326,11 @@ def manage_passwords():
                 return make_response(jsonify({
                     'message': 'Could not delete site entry'
                 }), 304)
+        elif request.method == 'GET':
+            try:
+                data = fetch_site_list(g.user['login'])
+            except Exception as e:
+                pass
 
 
 @app.route('/user/my-passwords/new', methods=['GET', 'POST', 'OPTIONS'])

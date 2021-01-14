@@ -1,10 +1,41 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'wrapper.html' %}
 
-</body>
-</html>
+{% block headcontent %}
+    <link rel="stylesheet" href="../static/styles/global.css"/>
+{% endblock %}
+
+{% block bodycontent %}
+    <div class="wrapper">
+        <div id="login-card" class="card justify-content-center">
+            <h5 class="card-header"><span>Register</span></h5>
+            <div class="card-body">
+                <form>
+                    <div class="mb-3">
+                        <label for="login" class="form-label">Login</label>
+                        <input type="text" class="form-control" id="login"
+                               placeholder="Your login"/>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email"
+                               placeholder="Your email"/>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password"
+                               placeholder="Your password"/>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password_rep" class="form-label">Repeat password</label>
+                        <input type="password" class="form-control" id="password_rep"
+                               placeholder="Your password again"/>
+                    </div>
+                    <p>
+                        <a href="/login">Already have an account? Log in!</a>
+                    </p>
+                    <button type="submit" class="btn btn-primary mb-3">Register</button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

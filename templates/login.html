@@ -1,10 +1,32 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
-    bonjour
-</body>
-</html>
+{% extends 'wrapper.html' %}
+
+{% block headcontent %}
+    <link rel="stylesheet" href="../static/styles/login.css"/>
+    <link rel="stylesheet" href="../static/styles/global.css"/>
+{% endblock %}
+
+{% block bodycontent %}
+    <div class="wrapper">
+        <div id="login-card" class="card justify-content-center">
+            <h5 class="card-header"><span>Log in</span></h5>
+            <div class="card-body py-3">
+                <form>
+                    <div class="mb-3">
+                        <label for="login" class="form-label">Login</label>
+                        <input type="text" class="form-control" id="login"
+                               placeholder="Your login"/>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password"
+                               placeholder="Your password"/>
+                    </div>
+                    <p>
+                        <a href="/register">Don't have an account? Register now!</a>
+                    </p>
+                    <button type="submit" class="btn btn-primary mb-3">Log in</button>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
