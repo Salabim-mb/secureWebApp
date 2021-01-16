@@ -31,3 +31,25 @@ const flashAlert = (msg, variant="danger") => {
         alert.hidden = true;
     }, 3000)
 };
+
+const handleLogoutClick = async (e) => {
+    e.preventDefault();
+    try {
+        let res = await performLogout();
+        if (res && res.message) {
+            flashAlert(res.message, "success")
+        }
+    } finally {
+        document.cookie = ""
+        window.location.pathname = "/login"
+    }
+};
+
+const performLogout = async () => {
+    const url = "/logout";
+    const res = await fetch(url, {
+        method: "GET"
+    });
+
+    return await res.json();
+}

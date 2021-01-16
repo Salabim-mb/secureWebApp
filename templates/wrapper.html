@@ -5,8 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet"
               integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
-        <script src="../static/scripts/global.js"></script>
-        <link rel="stylesheet" href="../static/styles/global.css"/>
+        <script type="text/javascript" src="https://cdn.rawgit.com/ricmoo/aes-js/e27b99df/index.js"></script>
+        <script src="/static/scripts/global.js"></script>
+        <link rel="stylesheet" href="/static/styles/global.css"/>
         {% block headcontent %}{% endblock %}
         <title>PassBuddy</title>
     </head>
@@ -26,7 +27,7 @@
                         {% if user %}
                             <a class="mx-3" href="/user/my-passwords">My passwords</a>
                             <a class="mx-3" href="/user">User page</a>
-                            <a class="mx-3" href="/logout">Log out</a>
+                            <a id="logout-btn" class="mx-3" href="/user/logout">Log out</a>
                         {% else %}
                             <a class="mx-3" href="/register">Register</a>
                             <a class="mx-3" href="/login">Log in</a>

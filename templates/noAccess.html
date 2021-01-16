@@ -1,0 +1,17 @@
+{% extends 'wrapper.html' %}
+
+{% block headcontent %}
+    <script src="../static/scripts/noAccess.js"></script>
+{% endblock %}
+
+{% block bodycontent %}
+    <div class="wrapper">
+        <div id="card" class="card justify-content-center">
+            <h5 class="card-header"><span>Oops...</span></h5>
+            <div class="card-body py-3">
+                <p>You have no access to this site. Perhaps you are not logged in or your session has expired.</p>
+                <a id="wrong-redir" href="/login">Go back to login page</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -53,7 +53,7 @@ def release_session(login):
             cursor.execute('delete from sessions where user = ?', [login])
             tran.commit()
     except Exception as e:
-        raise e
+        pass
 
 
 def decode_jwt_data(token):
@@ -87,8 +87,11 @@ def send_allowed(method_list):
 
 def parse_token(token):
     decoded = decode_jwt_data(token)
-    if decoded != {} and decoded['exp'] > int((datetime.now().timestamp())):
-        g.user = decoded
+    if decoded != {}:
+        if decoded['exp'] > int((datetime.now().timestamp())):
+            g.user = decoded
+        else:
+            release_session(decoded['login'])
     else:
         g.user = {}
     return g.user, token
@@ -178,9 +181,38 @@ def fetch_site_list(login):
             cursor = tran.cursor()
             cursor.execute('select * from site_passwords where user_ID = ?', [login])
             user_sites = cursor.fetchall()
-
+            parsed = []
+            for user in user_sites:
+                parsed.append({
+                    'site': user[1],
+                    'login': user[3]
+                })
+            return parsed
     except Exception as e:
-        raise e
+        return None
+
+
+def get_site_password(login, site):
+    try:
+        with sqlite3.connect('database.db') as tran:
+            cursor = tran.cursor()
+            cursor.execute('select * from site_passwords where user_ID = ? and site = ?', [login, site])
+            user_entry = cursor.fetchone()
+            return user_entry[4]
+    except Exception as e:
+        return None
+
+
+def add_credentials(site, user, login, password):
+    try:
+        with sqlite3.connect('database.db') as tran:
+            cursor = tran.cursor()
+            cursor.execute('insert into site_passwords (site, user_ID, login, password ) values (?,?,?,?)',
+                           [site, user, login, password])
+            tran.commit()
+        return True
+    except Exception as e:
+        return False
 
 
 @app.teardown_appcontext
@@ -249,16 +281,13 @@ def sign_in():
                         'message': 'Login successful',
                         'token': jwt_token
                     }), 200)
-                    print("po make response")
                     app.config.update(
                         SESSION_COOKIE_SECURE=True,
                         SESSION_COOKIE_HTTPONLY=True,
                         SESSION_COOKIE_SAMESITE='Strict',
                     )
-                    print("po appconfig")
                     res.set_cookie('token', jwt_token, secure=True, httponly=True,
                                    samesite='Strict', path="/")
-                    print("hmm")
                 else:
                     res = make_response(jsonify({
                         'message': 'Could not log in. Unknown error happened while attempting to write token'
@@ -348,11 +377,7 @@ def manage_user():
                 res.headers['Content-Type'] = 'application/json'
                 return res
         else:
-            res = make_response(jsonify({
-                'message': 'You have no access to this site'
-            }), 405)
-            res.headers['Content-Type'] = 'application/json'
-            return res
+            return render_template('noAccess.html')
 
 
 @app.route('/user/my-passwords', methods=['GET', 'DELETE', 'OPTIONS'])
@@ -364,24 +389,73 @@ def manage_passwords():
             try:
                 data = request.get_json()
                 delete_site_entry(data['site'], g.user['login'])
-                return make_response(jsonify({
+                res = make_response(jsonify({
                     'message': f'Site entry {data["site"]} deleted successfully'
                 }), 200)
             except Exception as e:
-                return make_response(jsonify({
+                res = make_response(jsonify({
                     'message': 'Could not delete site entry'
                 }), 304)
+            res.headers['Content-Type'] = 'application/json'
+            return res
         elif request.method == 'GET':
-            try:
-                data = fetch_site_list(g.user['login'])
-            except Exception as e:
-                pass
+            data = fetch_site_list(g.user['login'])
+            return render_template("services.html", services=data, user=g.user)
+    else:
+        return render_template('noAccess.html')
 
 
-@app.route('/user/my-passwords/new', methods=['GET', 'POST', 'OPTIONS'])
+@app.route('/user/my-passwords/site/<site_name>', methods=['GET'])
+def get_password(site_name):
+    if request.method == 'GET':
+        if g.user != {}:
+            password = get_site_password(g.user['login'], site_name)
+            if password is not None:
+                res = make_response(jsonify({
+                    'message': 'Password retrieved successfully',
+                    'password': password
+                }), 200)
+            else:
+                res = make_response(jsonify({
+                    'message': 'Could not retrieve password for this site'
+                }), 400)
+            res.headers['Content-Type'] = 'application/json'
+            return res
+        else:
+            return render_template("noAccess.html")
+
+
+@app.route('/user/my-passwords/new-password', methods=['GET', 'POST', 'OPTIONS'])
 def add_password():
     if request.method == 'OPTIONS':
         return send_allowed(['GET', 'POST'])
+    elif g.user != {}:
+        if request.method == 'GET':
+            return render_template('newPassword.html', user=g.user)
+        elif request.method == 'POST':
+            data = request.get_json()
+            site = data['site']
+            login = data['login']
+            password = data['password']
+            if None in [site, login, password]:
+                res = make_response(jsonify({
+                    'message': 'Wrong data provided'
+                }), 400)
+                res.headers['Content-Type'] = "application/json"
+                return res
+            else:
+                if add_credentials(site, g.user['login'], login, password):
+                    res = make_response(jsonify({
+                        'message': 'Password added successfully'
+                    }), 200)
+                else:
+                    res = make_response(jsonify({
+                        'message': 'Something bad happened :('
+                    }), 500)
+                res.headers['Content-Type'] = "application/json"
+                return res
+    else:
+        return render_template('noAccess.html')
 
 
 @app.route('/user/logout', methods=['GET', 'OPTIONS'])
@@ -395,16 +469,14 @@ def log_out():
             res = make_response(jsonify({
                 'message': 'Logged out successfully'
             }), 301)
-            res.headers['Location'] = url_for(sign_in)
-            return res
         else:
             res = make_response(jsonify({
                 'message': 'You are already logged out apparently'
             }), 301)
-            res.headers['Location'] = url_for(sign_in)
+        res.headers['Location'] = "/"
+        return res
 
 
 if __name__ == '__main__':
-    print("hello")
     init_db()
     app.run(ssl_context='adhoc', host='0.0.0.0', port=5000)

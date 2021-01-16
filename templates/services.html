@@ -1,10 +1,44 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Title</title>
-</head>
-<body>
+{% extends 'wrapper.html' %}
 
-</body>
-</html>
+{% block headcontent %}
+    <link rel="stylesheet" href="../static/styles/services.css" />
+    <script src="../static/scripts/services.js"></script>
+{% endblock %}
+
+{% block bodycontent %}
+    <div id="service-wrapper">
+        <div id="card" class="card justify-content-center">
+            <h5 class="card-header justify-content-center"><span>My services</span></h5>
+            <div class="card-body py-3">
+                <a href="/user/my-passwords/new-password">
+                    <button type="button" class="btn btn-success">Add new site entry</button>
+                </a>
+                <hr/>
+                <table class="table table-striped table-hover">
+                    {% if services %}
+                        <thead>
+                            <tr>
+                                <th scope="col">Site:</th>
+                                <th scope="col">Login:</th>
+                                <th scope="col">Password:</th>
+                                <th scope="col"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for service in services %}
+                                <tr>
+                                    <th scope="row">{{ service.site }}</th>
+                                    <td>{{ service.login }}</td>
+                                    <td id="pass-td"><span>Show password</span></td>
+                                    <td id="delete-btn"><button>&times;</button></td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    {% else %}
+                        <p>You have no saved passwords yet.</p>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

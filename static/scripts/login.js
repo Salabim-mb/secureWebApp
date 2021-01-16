@@ -1,6 +1,7 @@
 window.onload = () => {
     let form = document.querySelector("form");
     document.addEventListener("submit", async (e) => handleLoginSubmit(e, form));
+    document.querySelector('a#logout-btn').addEventListener('click', async (e) => handleLogoutClick(e));
 }
 
 const handleLoginSubmit = async(event, form) => {

@@ -6,3 +6,4 @@ bcrypt==3.2.0
 pyopenssl==19.1.0
 cryptography==3.2.1
 PyJWT==2.0.0
+Werkzeug~=1.0.1

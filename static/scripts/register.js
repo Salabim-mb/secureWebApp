@@ -2,6 +2,7 @@ window.onload = () => {
     let form = document.querySelector("form");
     document.addEventListener("submit", async (e) => handleRegisterSubmit(e, form));
     document.querySelector("input#password").addEventListener("input", (e) => checkPassStrength(e));
+    document.querySelector('a#logout-btn').addEventListener('click', async (e) => handleLogoutClick(e));
 }
 
 const handleRegisterSubmit = async(event, form) => {

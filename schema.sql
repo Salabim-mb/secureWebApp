@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS site_passwords (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     site TEXT NOT NULL,
     user_ID TEXT NOT NULL,
+    login TEXT NOT NULL,
     password TEXT NOT NULL,
     FOREIGN KEY(user_ID) REFERENCES users(login)
 );
