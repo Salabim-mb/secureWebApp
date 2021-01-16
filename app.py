@@ -330,7 +330,11 @@ def sign_in():
                 mp = get_master_password(login)
                 jwt_token = encode_jwt_data(login, mp)
                 if jwt_token is not None:
-                    register_user_session(login, jwt_token, request.headers['Host'])
+                    if 'X-Forwarded-For' in request.headers:
+                        host = request.headers['X-Forwarded-For']
+                    else:
+                        host = request.remote_addr
+                    register_user_session(login, jwt_token, host)
                     res = make_response(jsonify({
                         'message': 'Login successful',
                         'token': jwt_token
@@ -402,7 +406,11 @@ def sign_up():
             return res
         else:
             try:
-                register_user(email, login, password, request.headers['Host'])
+                if 'X-Forwarded-For' in request.headers:
+                    host = request.headers['X-Forwarded-For']
+                else:
+                    host = request.remote_addr
+                register_user(email, login, password, host)
                 res = make_response(jsonify({
                     'message': 'Registered successfully, now you can log in'
                 }), 200)
