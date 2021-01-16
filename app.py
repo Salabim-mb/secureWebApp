@@ -1,7 +1,6 @@
 from flask import Flask, render_template, make_response, request, g, jsonify, url_for, redirect
 import sqlite3
 from dotenv import load_dotenv
-from bcrypt import checkpw, hashpw, gensalt
 import jwt
 import os, re
 from datetime import datetime, timedelta
@@ -14,7 +13,6 @@ JWT_EXP_TIME = os.getenv("JWT_EXP_TIME")
 app = Flask(__name__, static_url_path="/static")
 app.config.from_object(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
-salt = gensalt(12)
 
 
 def get_db():
@@ -229,7 +227,7 @@ def sign_in():
         if g.user != {}:
             return redirect("/user")
         else:
-            return render_template("login.html")
+            return render_template("login.html", user=g.user)
     elif request.method == 'POST':
         data = request.get_json()
         login = data.get('login')
@@ -282,7 +280,7 @@ def sign_up():
         if g.user != {}:
             return redirect('/user')
         else:
-            return render_template("register.html")
+            return render_template("register.html", user=g.user)
     elif request.method == 'POST':
         data = request.get_json()
         email = data['email']
@@ -342,7 +340,7 @@ def manage_user():
         if g.user != {}:
             try:
                 data, connections = fetch_user_data(g.user['login'])
-                return render_template("user.html", data=data, connections=connections)
+                return render_template("user.html", data=data, connections=connections, user=g.user)
             except Exception as e:
                 res = make_response(jsonify({
                     'message': 'Unknown error happened while trying to fetch user data'

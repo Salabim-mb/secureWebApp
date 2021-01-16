@@ -23,7 +23,14 @@
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNavAltMarkup">
                     <div class="navbar-nav">
-                        <a class="nav-link active" aria-current="page" href="#">User</a>
+                        {% if user %}
+                            <a class="mx-3" href="/user/my-passwords">My passwords</a>
+                            <a class="mx-3" href="/user">User page</a>
+                            <a class="mx-3" href="/logout">Log out</a>
+                        {% else %}
+                            <a class="mx-3" href="/register">Register</a>
+                            <a class="mx-3" href="/login">Log in</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
