@@ -26,7 +26,6 @@ const performRegistration = async (data) => {
     });
 
     if (res.status === 200) {
-        console.log(res)
         return await res.json();
     } else {
         throw await res.json();
@@ -49,7 +48,6 @@ const checkPassStrength = (e) => {
 
 const updatePassStrengthTag = (value, passStrElement) => {
     let text = "Password strength: "
-    console.log(value)
     switch (value) {
         case 0:
             text += "Very weak";
