@@ -40,13 +40,13 @@ const handleLogoutClick = async (e) => {
             flashAlert(res.message, "success")
         }
     } finally {
-        document.cookie = ""
+        document.cookie = "" // irrelevant, cookie has expired eitherway
         window.location.pathname = "/login"
     }
 };
 
 const performLogout = async () => {
-    const url = "/logout";
+    const url = "/user/logout";
     const res = await fetch(url, {
         method: "GET"
     });
