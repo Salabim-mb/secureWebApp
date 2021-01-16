@@ -1,13 +1,12 @@
 from flask import Flask, render_template, make_response, request, g, jsonify, url_for, redirect
 import sqlite3
 from dotenv import load_dotenv
-import uuid
-import json
 from bcrypt import checkpw, hashpw, gensalt
 import jwt
 import os, re
 from datetime import datetime, timedelta
 from time import sleep
+from werkzeug.security import generate_password_hash, check_password_hash
 
 load_dotenv()
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -38,12 +37,14 @@ def register_user_session(login, token, current_host):
         with sqlite3.connect('database.db') as tran:
             cursor = tran.cursor()
             cursor.execute('insert into sessions (user, session_token) values (?,?)', [login, token])
-            user = cursor.execute('select * from users where login = ? limit 1', [login])
-            if current_host not in user['hosts']:
-                new_hosts = user['hosts'] + f'{current_host};'
-                cursor.execute('insert into sessions (hosts) values (?)', [new_hosts])
+            cursor.execute('select * from users where login = ? limit 1', [login])
+            user = cursor.fetchone()
+            if current_host not in user[4]:
+                new_hosts = user[4] + f'{current_host};'
+                tran.cursor().execute('update users set hosts=(?) where login = ?', [new_hosts, login])
             tran.commit()
     except Exception as e:
+        print(e)
         raise e
 
 
@@ -57,7 +58,6 @@ def release_session(login):
         raise e
 
 
-
 def decode_jwt_data(token):
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
@@ -68,12 +68,14 @@ def decode_jwt_data(token):
 
 def encode_jwt_data(login):
     try:
-        return jwt.encode({
+        token = jwt.encode({
             'login': login,
             'last_login': datetime.now().isoformat(),
             'exp': int((datetime.now() + timedelta(seconds=int(JWT_EXP_TIME))).timestamp())
-        }, JWT_SECRET, algorithms=['HS256'])
+        }, JWT_SECRET, algorithm='HS256')
+        return token
     except Exception as e:
+        print(e)
         return None
 
 
@@ -85,13 +87,9 @@ def send_allowed(method_list):
     return response
 
 
-def parse_token(tok):
-    try:
-        token = tok.replace('Token ', '')
-    except Exception as e:
-        token = ''
+def parse_token(token):
     decoded = decode_jwt_data(token)
-    if decoded != {} and decoded['exp'] > int((datetime.now() + timedelta(seconds=int(JWT_EXP_TIME))).timestamp()):
+    if decoded != {} and decoded['exp'] > int((datetime.now().timestamp())):
         g.user = decoded
     else:
         g.user = {}
@@ -100,12 +98,10 @@ def parse_token(tok):
 
 def verify_user(login, password):
     try:
-        enc = hashpw(password.encode(), salt)
-        enc2 = hashpw(enc, salt)
         g.db = sqlite3.connect('database.db')
-        cursor = g.db.execute('select * from users where login = ? and password = ?', [login, enc2])
+        cursor = g.db.execute('select * from users where login = ?', [login])
         current_user = cursor.fetchone()
-        return checkpw(enc2, current_user[3].encode())
+        return check_password_hash(current_user[3], password)
     except Exception as e:
         return False
 
@@ -114,10 +110,10 @@ def check_login_available(login):
     try:
         with sqlite3.connect('database.db') as tran:
             cursor = tran.execute('select * from users where login = ?', [login])
-            if login in cursor.fetchall():
-                return False
-            else:
+            if cursor.fetchone() is None:
                 return True
+            else:
+                return False
     except Exception as e:
         return False
 
@@ -126,16 +122,22 @@ def check_password_strength(password):
     pattern1 = re.compile('[A-Z]+')
     pattern2 = re.compile('[0-9]+')
     pattern3 = re.compile('[!@#$%^&*()]+')
-    return re.match(pattern1, password) and re.match(pattern2, password) and re.match(pattern3, password)
+    return bool(re.search(pattern1, password)) and \
+           bool(re.search(pattern2, password)) and \
+           bool(re.search(pattern3, password)) and \
+           len(password) >= 8
 
 
 def register_user(email, login, password, host):
+    enc = generate_password_hash(password=password, method='pbkdf2:sha256:100000')
     try:
         with sqlite3.connect('database.db') as tran:
             cursor = tran.cursor()
-            cursor.execute('insert into users (email, login, password, hosts) values (?,?)', [email, login, password, f'{host};'])
+            cursor.execute('insert into users (email, login, password, hosts) values (?,?,?,?)',
+                           [email, login, enc, f'{host};'])
             tran.commit()
     except Exception as e:
+        print(e)
         raise e
 
 
@@ -145,8 +147,9 @@ def fetch_user_data(login):
             cursor = tran.cursor()
             cursor.execute('select * from users where login = ?', [login])
             current_user = cursor.fetchone()
-            return {'email': current_user['email'], 'login': current_user['login']}, current_user['hosts'].slice('')
+            return {'email': current_user[1], 'login': current_user[2]}, current_user[4][:-1].split(';')
     except Exception as e:
+        print(e)
         raise e
 
 
@@ -156,7 +159,7 @@ def check_session_registered(token, login):
             cursor = tran.cursor()
             cursor.execute('select * from sessions where session_token = ?', [token])
             current_user = cursor.fetchone()
-            return cursor.fetchone() is not None and current_user['user'] == login
+            return current_user is not None and current_user[1] == login
     except Exception as e:
         raise e
 
@@ -182,14 +185,32 @@ def fetch_site_list(login):
         raise e
 
 
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
+
+
 @app.before_request
 def check_auth():
-    g.user, token = parse_token(request.headers.get('Authorization'))
+    try:
+        token = request.headers['Cookie']
+        token = token.replace('token=', '')
+    except Exception:
+        token = ''
+    g.user, token = parse_token(token)
     try:
         if not check_session_registered(token, g.user['login']):
             g.user = {}
     except Exception as e:
         pass
+
+
+@app.after_request
+def modify_header_security(res):
+    res.headers['Server'] = 'Obviously there is a server, it\'s confidential though'
+    return res
 
 
 @app.route('/', methods=['GET', 'OPTIONS'])
@@ -206,46 +227,51 @@ def sign_in():
         return send_allowed(['GET', 'POST'])
     elif request.method == 'GET':
         if g.user != {}:
-            return redirect(url_for(manage_user))
+            return redirect("/user")
         else:
             return render_template("login.html")
     elif request.method == 'POST':
-        sleep(1)  # make bruteforcing more tedious
         data = request.get_json()
         login = data.get('login')
         password = data.get('password')
-        pattern = re.compile('[a-zA-Z]|[0-9]|-|_')
+        pattern = re.compile(r'([a-zA-Z]|[0-9]|-|_){1,128}')
         if None in [login, password] or \
-                pattern.match(login) is False or \
+                bool(pattern.match(login)) is False or \
                 verify_user(login, password) is False:
-            return make_response(jsonify({
+            sleep(1)  # make bruteforcing more tedious
+            res = make_response(jsonify({
                 'message': 'Invalid credentials'
             }), 400)
         else:
             try:
-                jwt_bytes = encode_jwt_data(login)
-                if jwt_bytes is not None:
-                    register_user_session(jwt_bytes.decode())
+                jwt_token = encode_jwt_data(login)
+                if jwt_token is not None:
+                    register_user_session(login, jwt_token, request.headers['Host'])
                     res = make_response(jsonify({
                         'message': 'Login successful',
-                        'token': jwt_bytes.decode()
+                        'token': jwt_token
                     }), 200)
+                    print("po make response")
                     app.config.update(
                         SESSION_COOKIE_SECURE=True,
                         SESSION_COOKIE_HTTPONLY=True,
                         SESSION_COOKIE_SAMESITE='Strict',
                     )
-                    res.set_cookie('token', f'Token {jwt_bytes.decode()}', secure=True, httponly=True,
+                    print("po appconfig")
+                    res.set_cookie('token', jwt_token, secure=True, httponly=True,
                                    samesite='Strict', path="/")
-                    return res
+                    print("hmm")
                 else:
-                    return make_response(jsonify({
+                    res = make_response(jsonify({
                         'message': 'Could not log in. Unknown error happened while attempting to write token'
                     }), 500)
             except Exception as e:
-                return make_response(jsonify({
+                print(e)
+                res = make_response(jsonify({
                     'message': 'Something bad happened... Like, really bad :('
                 }), 500)
+        res.headers['Content-Type'] = 'application/json'
+        return res
 
 
 @app.route('/register', methods=['GET', 'POST', 'OPTIONS'])
@@ -254,7 +280,7 @@ def sign_up():
         return send_allowed(['GET', 'POST'])
     elif request.method == 'GET':
         if g.user != {}:
-            return redirect(url_for(manage_user))
+            return redirect('/user')
         else:
             return render_template("register.html")
     elif request.method == 'POST':
@@ -263,36 +289,49 @@ def sign_up():
         login = data['login']
         password = data['password']
         password_rep = data['password_rep']
+        email_pattern = re.compile(r'([a-zA-Z]|[0-9]|_|-)+@([a-zA-Z]|[0-9]|[.])+[.][a-zA-Z]{1,128}')
+        login_pattern = re.compile(r'([a-zA-Z]|[0-9]|-|_){1,128}')
         if None in [login, email] or \
-                re.match(re.compile('([a-zA-Z]|_|-)+@([a-zA-Z]|[0-9]|\.)+.[a-zA-Z]+'), email) is False or \
-                re.match(re.compile('([a-zA-Z]|[0-9]|-|_){1,}'), login):
-            return make_response(jsonify({
+                bool(email_pattern.search(email)) is False or \
+                bool(login_pattern.search(login)) is False:
+            res = make_response(jsonify({
                 'message': 'Wrong data provided'
             }), 400)
-        if not check_login_available(login):
-            return make_response(jsonify({
+            res.headers['Content-Type'] = "application/json"
+            return res
+        elif not check_login_available(login):
+            res = make_response(jsonify({
                 'message': 'Login taken'
             }), 400)
-        if password != password_rep:
-            return make_response(jsonify({
+            res.headers['Content-Type'] = "application/json"
+            return res
+        elif password != password_rep:
+            res = make_response(jsonify({
                 'message': 'Passwords don\'t match'
             }), 400)
-        if not check_password_strength(password):
-            return make_response(jsonify({
-                'message': 'Password is too weak. Good password must consist of at least 8 characters and include '
-                           'at least one capital letter, one number and one special character from !@#$%^&*()'
-            }), 400)
-        try:
-            register_user(email, login, password)
-            res = make_response(jsonify({
-                'message': 'Registered successfully, now you can log in. Redirecting...'
-            }), 301)
-            res.headers['Location'] = url_for(sign_in)
+            res.headers['Content-Type'] = "application/json"
             return res
-        except Exception as e:
-            return make_response(jsonify({
-                'message': 'Unknown error happened while trying to register'
-            }), 500)
+        elif not check_password_strength(password):
+            res = make_response(jsonify({
+                'message': 'Password is too weak. Good password must consist of at least 8 characters and include '
+                           'at least one capital letter, one number and one special character from !@#$%^&*()-_'
+            }), 400)
+            res.headers['Content-Type'] = "application/json"
+            return res
+        else:
+            try:
+                register_user(email, login, password, request.headers['Host'])
+                res = make_response(jsonify({
+                    'message': 'Registered successfully, now you can log in'
+                }), 200)
+                res.headers['Location'] = url_for('sign_in')
+                return res
+            except Exception as e:
+                res = make_response(jsonify({
+                    'message': 'Unknown error happened while trying to register'
+                }), 500)
+            res.headers['Content-Type'] = "application/json"
+            return res
 
 
 @app.route('/user', methods=['GET', 'OPTIONS'])
@@ -305,9 +344,17 @@ def manage_user():
                 data, connections = fetch_user_data(g.user['login'])
                 return render_template("user.html", data=data, connections=connections)
             except Exception as e:
-                return make_response(jsonify({
+                res = make_response(jsonify({
                     'message': 'Unknown error happened while trying to fetch user data'
                 }), 500)
+                res.headers['Content-Type'] = 'application/json'
+                return res
+        else:
+            res = make_response(jsonify({
+                'message': 'You have no access to this site'
+            }), 405)
+            res.headers['Content-Type'] = 'application/json'
+            return res
 
 
 @app.route('/user/my-passwords', methods=['GET', 'DELETE', 'OPTIONS'])
@@ -360,5 +407,6 @@ def log_out():
 
 
 if __name__ == '__main__':
+    print("hello")
     init_db()
-    app.run()
+    app.run(ssl_context='adhoc', host='0.0.0.0', port=5000)

@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS users (
-    id UUID PRIMARY KEY,
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     email TEXT UNIQUE NOT NULL,
     login TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
@@ -18,5 +18,5 @@ CREATE TABLE IF NOT EXISTS site_passwords (
     site TEXT NOT NULL,
     user_ID TEXT NOT NULL,
     password TEXT NOT NULL,
-    FOREIGN KEY(user_ID) REFERENCES users(id)
+    FOREIGN KEY(user_ID) REFERENCES users(login)
 );

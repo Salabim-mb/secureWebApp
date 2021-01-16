@@ -2,7 +2,7 @@
 
 {% block headcontent %}
     <link rel="stylesheet" href="../static/styles/login.css"/>
-    <link rel="stylesheet" href="../static/styles/global.css"/>
+    <script src="../static/scripts/login.js"></script>
 {% endblock %}
 
 {% block bodycontent %}
@@ -14,12 +14,12 @@
                     <div class="mb-3">
                         <label for="login" class="form-label">Login</label>
                         <input type="text" class="form-control" id="login"
-                               placeholder="Your login"/>
+                               placeholder="Your login" name="login"/>
                     </div>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
                         <input type="password" class="form-control" id="password"
-                               placeholder="Your password"/>
+                               placeholder="Your password" name="password"/>
                     </div>
                     <p>
                         <a href="/register">Don't have an account? Register now!</a>

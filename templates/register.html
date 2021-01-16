@@ -1,7 +1,8 @@
 {% extends 'wrapper.html' %}
 
 {% block headcontent %}
-    <link rel="stylesheet" href="../static/styles/global.css"/>
+    <script src="../static/scripts/register.js"></script>
+    <link rel="stylesheet" href="../static/styles/register.css" />
 {% endblock %}
 
 {% block bodycontent %}
@@ -13,22 +14,25 @@
                     <div class="mb-3">
                         <label for="login" class="form-label">Login</label>
                         <input type="text" class="form-control" id="login"
-                               placeholder="Your login"/>
+                               placeholder="Your login" name="login" required/>
                     </div>
                     <div class="mb-3">
                         <label for="email" class="form-label">Email</label>
                         <input type="email" class="form-control" id="email"
-                               placeholder="Your email"/>
+                               placeholder="Your email" name="email" required/>
                     </div>
+                    <p id="pass-XI" class="weak">
+                        Password strength: Very weak
+                    </p>
                     <div class="mb-3">
                         <label for="password" class="form-label">Password</label>
                         <input type="password" class="form-control" id="password"
-                               placeholder="Your password"/>
+                               placeholder="Your password" name="password" required/>
                     </div>
                     <div class="mb-3">
                         <label for="password_rep" class="form-label">Repeat password</label>
                         <input type="password" class="form-control" id="password_rep"
-                               placeholder="Your password again"/>
+                               placeholder="Your password again" name="password_rep" required/>
                     </div>
                     <p>
                         <a href="/login">Already have an account? Log in!</a>

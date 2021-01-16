@@ -1,3 +1,16 @@
 .wrapper {
-    margin: 25vh 30vw;
+    width: 40%;
+    top: 20%;
+    left: 30%;
+    position: absolute;
+}
+
+body {
+    background-image: url("../assets/bg.jpg");
+    background-size: cover;
+}
+
+.floating-alert {
+    position: absolute;
+
 }
