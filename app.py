@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from time import sleep
 from werkzeug.security import generate_password_hash, check_password_hash
 from Crypto.Cipher import AES
-from Crypto.Protocol.KDF import  PBKDF2
+from Crypto.Protocol.KDF import PBKDF2
 from Crypto import Random
 
 load_dotenv()
