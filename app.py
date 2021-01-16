@@ -1,6 +1,6 @@
 import base64
 import uuid
-
+import ssl
 from flask import Flask, render_template, make_response, request, g, jsonify, url_for, redirect
 import sqlite3
 from dotenv import load_dotenv
@@ -18,7 +18,12 @@ JWT_SECRET = os.getenv("JWT_SECRET")
 JWT_EXP_TIME = os.getenv("JWT_EXP_TIME")
 app = Flask(__name__, static_url_path="/static")
 app.config.from_object(__name__)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['SESSION_COOKIE_SECURE'] = True
 app.secret_key = os.getenv("SECRET_KEY")
+
+context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+context.load_cert_chain('certificate.cert', 'private.key')
 
 
 # snippet from https://www.quickprogrammingtips.com/python/aes-256-encryption-and-decryption-in-python.html
@@ -313,6 +318,7 @@ def sign_in():
         password = data.get('password')
         pattern = re.compile(r'([a-zA-Z]|[0-9]|-|_){1,128}')
         if None in [login, password] or \
+                ' ' in login or ' ' in password or \
                 bool(pattern.match(login)) is False or \
                 verify_user(login, password) is False:
             sleep(1)  # make bruteforcing more tedious
@@ -367,6 +373,7 @@ def sign_up():
         email_pattern = re.compile(r'([a-zA-Z]|[0-9]|_|-)+@([a-zA-Z]|[0-9]|[.])+[.][a-zA-Z]{1,128}')
         login_pattern = re.compile(r'([a-zA-Z]|[0-9]|-|_){1,128}')
         if None in [login, email] or \
+                ' ' in login or ' ' in email or ' ' in password or \
                 bool(email_pattern.search(email)) is False or \
                 bool(login_pattern.search(login)) is False:
             res = make_response(jsonify({
@@ -488,7 +495,8 @@ def add_password():
             site = data['site']
             login = data['login']
             password = data['password']
-            if None in [site, login, password]:
+            if None in [site, login, password] or \
+                    ' ' in login or ' ' in password:
                 res = make_response(jsonify({
                     'message': 'Wrong data provided'
                 }), 400)

@@ -5,5 +5,5 @@ __pycache__/
 
 # Files
 .env
-database.db
-
+certificate.cert
+private.key
