@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     login TEXT UNIQUE NOT NULL,
     password TEXT NOT NULL,
+    mp TEXT NOT NULL,
     hosts TEXT
 );
 
@@ -19,5 +20,6 @@ CREATE TABLE IF NOT EXISTS site_passwords (
     user_ID TEXT NOT NULL,
     login TEXT NOT NULL,
     password TEXT NOT NULL,
+    salt TEXT NOT NULL,
     FOREIGN KEY(user_ID) REFERENCES users(login)
 );

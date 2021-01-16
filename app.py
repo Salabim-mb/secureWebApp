@@ -1,3 +1,6 @@
+import base64
+import uuid
+
 from flask import Flask, render_template, make_response, request, g, jsonify, url_for, redirect
 import sqlite3
 from dotenv import load_dotenv
@@ -6,6 +9,9 @@ import os, re
 from datetime import datetime, timedelta
 from time import sleep
 from werkzeug.security import generate_password_hash, check_password_hash
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import  PBKDF2
+from Crypto import Random
 
 load_dotenv()
 JWT_SECRET = os.getenv("JWT_SECRET")
@@ -13,6 +19,35 @@ JWT_EXP_TIME = os.getenv("JWT_EXP_TIME")
 app = Flask(__name__, static_url_path="/static")
 app.config.from_object(__name__)
 app.secret_key = os.getenv("SECRET_KEY")
+
+
+# snippet from https://www.quickprogrammingtips.com/python/aes-256-encryption-and-decryption-in-python.html
+BLOCK_SIZE = 16
+pad = lambda s: s + (BLOCK_SIZE - len(s) % BLOCK_SIZE) * chr(BLOCK_SIZE - len(s) % BLOCK_SIZE)
+unpad = lambda s: s[:-ord(s[len(s) - 1:])]
+
+
+def get_key(password, salt):
+    pbkdf2 = PBKDF2(password, salt, 64, 1000)
+    key = pbkdf2[:32]
+    return key
+
+
+def encrypt(raw, password, salt):
+    private_key = get_key(password, salt)
+    raw = pad(raw)
+    iv = Random.new().read(AES.block_size)
+    cipher = AES.new(private_key, AES.MODE_CBC, iv)
+    return base64.b64encode(iv + cipher.encrypt(raw.encode('utf-8')))
+
+
+def decrypt(enc, password, salt):
+    private_key = get_key(password, salt)
+    enc = base64.b64decode(enc)
+    iv = enc[:16]
+    cipher = AES.new(private_key, AES.MODE_CBC, iv)
+    return unpad(cipher.decrypt(enc[16:]))
+###
 
 
 def get_db():
@@ -37,8 +72,8 @@ def register_user_session(login, token, current_host):
             cursor.execute('insert into sessions (user, session_token) values (?,?)', [login, token])
             cursor.execute('select * from users where login = ? limit 1', [login])
             user = cursor.fetchone()
-            if current_host not in user[4]:
-                new_hosts = user[4] + f'{current_host};'
+            if current_host not in user[5]:
+                new_hosts = user[5] + f'{current_host};'
                 tran.cursor().execute('update users set hosts=(?) where login = ?', [new_hosts, login])
             tran.commit()
     except Exception as e:
@@ -64,10 +99,11 @@ def decode_jwt_data(token):
         return {}
 
 
-def encode_jwt_data(login):
+def encode_jwt_data(login, mp):
     try:
         token = jwt.encode({
             'login': login,
+            'mp': mp,
             'last_login': datetime.now().isoformat(),
             'exp': int((datetime.now() + timedelta(seconds=int(JWT_EXP_TIME))).timestamp())
         }, JWT_SECRET, algorithm='HS256')
@@ -131,11 +167,12 @@ def check_password_strength(password):
 
 def register_user(email, login, password, host):
     enc = generate_password_hash(password=password, method='pbkdf2:sha256:100000')
+    print(uuid.uuid4())
     try:
         with sqlite3.connect('database.db') as tran:
             cursor = tran.cursor()
-            cursor.execute('insert into users (email, login, password, hosts) values (?,?,?,?)',
-                           [email, login, enc, f'{host};'])
+            cursor.execute('insert into users (email, login, password, mp, hosts) values (?,?,?,?,?)',
+                           [email, login, enc, str(uuid.uuid4()), f'{host};'])
             tran.commit()
     except Exception as e:
         print(e)
@@ -148,9 +185,8 @@ def fetch_user_data(login):
             cursor = tran.cursor()
             cursor.execute('select * from users where login = ?', [login])
             current_user = cursor.fetchone()
-            return {'email': current_user[1], 'login': current_user[2]}, current_user[4][:-1].split(';')
+            return {'email': current_user[1], 'login': current_user[2]}, current_user[5][:-1].split(';')
     except Exception as e:
-        print(e)
         raise e
 
 
@@ -198,21 +234,32 @@ def get_site_password(login, site):
             cursor = tran.cursor()
             cursor.execute('select * from site_passwords where user_ID = ? and site = ?', [login, site])
             user_entry = cursor.fetchone()
-            return user_entry[4]
+            return user_entry[4], user_entry[5]
     except Exception as e:
         return None
 
 
-def add_credentials(site, user, login, password):
+def add_credentials(site, user, login, password, salt):
     try:
         with sqlite3.connect('database.db') as tran:
             cursor = tran.cursor()
-            cursor.execute('insert into site_passwords (site, user_ID, login, password ) values (?,?,?,?)',
-                           [site, user, login, password])
+            cursor.execute('insert into site_passwords (site, user_ID, login, password, salt) values (?,?,?,?,?)',
+                           [site, user, login, password, salt])
             tran.commit()
         return True
     except Exception as e:
         return False
+
+
+def get_master_password(login):
+    try:
+        with sqlite3.connect('database.db') as tran:
+            cursor = tran.cursor()
+            cursor.execute('select * from users where login = ?', [login])
+            current_user = cursor.fetchone()
+            return current_user[4]
+    except Exception as e:
+        raise e
 
 
 @app.teardown_appcontext
@@ -274,7 +321,8 @@ def sign_in():
             }), 400)
         else:
             try:
-                jwt_token = encode_jwt_data(login)
+                mp = get_master_password(login)
+                jwt_token = encode_jwt_data(login, mp)
                 if jwt_token is not None:
                     register_user_session(login, jwt_token, request.headers['Host'])
                     res = make_response(jsonify({
@@ -399,6 +447,7 @@ def manage_passwords():
             res.headers['Content-Type'] = 'application/json'
             return res
         elif request.method == 'GET':
+            sleep(1)
             data = fetch_site_list(g.user['login'])
             return render_template("services.html", services=data, user=g.user)
     else:
@@ -409,11 +458,13 @@ def manage_passwords():
 def get_password(site_name):
     if request.method == 'GET':
         if g.user != {}:
-            password = get_site_password(g.user['login'], site_name)
+            password, salt = get_site_password(g.user['login'], site_name)
             if password is not None:
+                password = decrypt(password, g.user['mp'], salt)
+                print(password)
                 res = make_response(jsonify({
                     'message': 'Password retrieved successfully',
-                    'password': password
+                    'password': password.decode()
                 }), 200)
             else:
                 res = make_response(jsonify({
@@ -444,7 +495,9 @@ def add_password():
                 res.headers['Content-Type'] = "application/json"
                 return res
             else:
-                if add_credentials(site, g.user['login'], login, password):
+                salt = os.urandom(8)
+                password = encrypt(password, g.user['mp'], salt)
+                if add_credentials(site, g.user['login'], login, password, salt):
                     res = make_response(jsonify({
                         'message': 'Password added successfully'
                     }), 200)
